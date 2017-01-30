@@ -21,8 +21,8 @@ namespace SslStreamPerf
         [Verb("server")]
         private class ServerOptions : CommonOptions
         {
-            [Option('b', "bytes", HelpText = "Number of bytes to send", Default = 100 * 1024 * 1024)]
-            public long Bytes { get; set; }
+            [Option('m', "megabytes", HelpText = "Number of megabytes to send", Default = 100)]
+            public int Megabytes { get; set; }
         }
 
         [Verb("client")]
@@ -51,7 +51,7 @@ namespace SslStreamPerf
             var listener = new TcpListener(IPAddress.Any, options.Port);
             listener.Start();
 
-            Console.WriteLine($"Bytes: {string.Format("{0:n0}", options.Bytes)}");
+            Console.WriteLine($"Megabytes: {string.Format("{0:n0}", options.Megabytes)}");
             Console.WriteLine($"Listening on port {options.Port}...");
 
             while (true)
@@ -61,7 +61,7 @@ namespace SslStreamPerf
                 {
                     await stream.AuthenticateAsServerAsync(cert);
 
-                    var data = new ZeroStream(options.Bytes);
+                    var data = new ZeroStream(options.Megabytes * 1024 * 1024);
 
                     Console.WriteLine();
                     Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
