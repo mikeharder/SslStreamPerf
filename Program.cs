@@ -14,8 +14,8 @@ namespace SslStreamPerf
     {
         private class CommonOptions
         {
-            [Option('a', "async", Default = true)]
-            public bool Async { get; set; }
+            [Option('s', "sync")]
+            public bool Sync { get; set; }
 
             [Option('b', "bufferLength", Default = 1024 * 1024)]
             public int BufferLength { get; set; }
@@ -54,7 +54,7 @@ namespace SslStreamPerf
             var listener = new TcpListener(IPAddress.Any, options.Port);
             listener.Start();
 
-            Console.WriteLine($"Async: {options.Async}");
+            Console.WriteLine($"Sync: {options.Sync}");
             Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
             Console.WriteLine($"Megabytes: {string.Format("{0:n0}", options.Megabytes)}");
             Console.WriteLine();
@@ -74,13 +74,13 @@ namespace SslStreamPerf
                     Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
 
                     var sw = Stopwatch.StartNew();
-                    if (options.Async)
+                    if (options.Sync)
                     {
-                        await data.CopyToAsync(stream, options.BufferLength);
+                        data.CopyTo(stream, options.BufferLength);
                     }
                     else
                     {
-                        data.CopyTo(stream, options.BufferLength);
+                        await data.CopyToAsync(stream, options.BufferLength);
                     }
                     sw.Stop();
 
@@ -96,7 +96,7 @@ namespace SslStreamPerf
 
             using (var client = new TcpClient())
             {
-                Console.WriteLine($"Async: {options.Async}");
+                Console.WriteLine($"Sync: {options.Sync}");
                 Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
                 Console.WriteLine();
 
@@ -114,16 +114,16 @@ namespace SslStreamPerf
                     Console.WriteLine("Reading...");
 
                     var sw = Stopwatch.StartNew();
-                    if (options.Async)
+                    if (options.Sync)
                     {
-                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
                         {
                             totalBytesRead += bytesRead;
                         }
                     }
                     else
                     {
-                        while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
                         {
                             totalBytesRead += bytesRead;
                         }
