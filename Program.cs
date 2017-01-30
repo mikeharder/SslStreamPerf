@@ -14,6 +14,12 @@ namespace SslStreamPerf
     {
         private class CommonOptions
         {
+            [Option('a', "async", Default = true)]
+            public bool Async { get; set; }
+
+            [Option('b', "bufferLength", Default = 1024 * 1024)]
+            public int BufferLength { get; set; }
+
             [Option('p', "port", Default = 8080)]
             public int Port { get; set; }
         }
@@ -28,9 +34,6 @@ namespace SslStreamPerf
         [Verb("client")]
         private class ClientOptions : CommonOptions
         {
-            [Option('b', "bufferLength", Default = 1024 * 1024)]
-            public int BufferLength { get; set; }
-
             [Option('h', "host", Required = true)]
             public string Host { get; set; }
         }
@@ -67,7 +70,14 @@ namespace SslStreamPerf
                     Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
 
                     var sw = Stopwatch.StartNew();
-                    await data.CopyToAsync(stream);
+                    if (options.Async)
+                    {
+                        await data.CopyToAsync(stream, options.BufferLength);
+                    }
+                    else
+                    {
+                        data.CopyTo(stream, options.BufferLength);
+                    }
                     sw.Stop();
 
                     var mbps = ((data.Length * 8) / (1024 * 1024)) / sw.Elapsed.TotalSeconds;
@@ -96,9 +106,19 @@ namespace SslStreamPerf
                     Console.WriteLine("Reading...");
 
                     var sw = Stopwatch.StartNew();
-                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    if (options.Async)
                     {
-                        totalBytesRead += bytesRead;
+                        while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                        {
+                            totalBytesRead += bytesRead;
+                        }
+                    }
+                    else
+                    {
+                        while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
+                        {
+                            totalBytesRead += bytesRead;
+                        }
                     }
                     sw.Stop();
 
