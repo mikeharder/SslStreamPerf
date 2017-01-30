@@ -3,11 +3,11 @@
 ## Server
 ```
 build.cmd
-run.cmd
+run-server.cmd
 ```
 
 ## Client
 ```
 build.cmd
-run.cmd -h host
+run-client.cmd -h host
 ```
