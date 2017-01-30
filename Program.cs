@@ -46,8 +46,6 @@ namespace SslStreamPerf
 
         private static async Task<int> RunServerAsync(ServerOptions options)
         {
-            var data = new ZeroStream(options.Bytes);
-
             var cert = new X509Certificate2("testCert.pfx", "testPassword");
 
             var listener = new TcpListener(IPAddress.Any, options.Port);
@@ -62,6 +60,8 @@ namespace SslStreamPerf
                 using (var stream = new SslStream(client.GetStream()))
                 {
                     await stream.AuthenticateAsServerAsync(cert);
+
+                    var data = new ZeroStream(options.Bytes);
 
                     Console.WriteLine();
                     Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
