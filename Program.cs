@@ -54,7 +54,11 @@ namespace SslStreamPerf
             var listener = new TcpListener(IPAddress.Any, options.Port);
             listener.Start();
 
+            Console.WriteLine($"Async: {options.Async}");
+            Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
             Console.WriteLine($"Megabytes: {string.Format("{0:n0}", options.Megabytes)}");
+            Console.WriteLine();
+
             Console.WriteLine($"Listening on port {options.Port}...");
 
             while (true)
@@ -92,6 +96,10 @@ namespace SslStreamPerf
 
             using (var client = new TcpClient())
             {
+                Console.WriteLine($"Async: {options.Async}");
+                Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
+                Console.WriteLine();
+
                 Console.WriteLine($"Connecting to {options.Host}:{options.Port}...");
 
                 await client.ConnectAsync(options.Host, options.Port);
