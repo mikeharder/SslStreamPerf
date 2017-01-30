@@ -27,7 +27,7 @@ namespace SslStreamPerf
         [Verb("server")]
         private class ServerOptions : CommonOptions
         {
-            [Option('m', "megabytes", HelpText = "Number of megabytes to send", Default = 100)]
+            [Option('m', "megabytes", HelpText = "Number of megabytes to send", Default = 1024)]
             public long Megabytes { get; set; }
         }
 
