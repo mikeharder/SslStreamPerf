@@ -25,6 +25,9 @@ namespace SslStreamPerf
             [Option('u', "multiStream")]
             public bool MultiStream { get; set; }
 
+            [Option('l', "multiStreamBlockLength", Default = 16 * 1024)]
+            public int MultiStreamBlockLength { get; set; }
+
             [Option('p', "port", Default = 8080)]
             public int Port { get; set; }
 
@@ -141,7 +144,7 @@ namespace SslStreamPerf
                     streams[i] = stream;
                 }
 
-                using (var multiStream = new MultiStream(streams))
+                using (var multiStream = new MultiStream(streams, options.MultiStreamBlockLength))
                 {
                     Console.WriteLine();
                     Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
@@ -260,7 +263,7 @@ namespace SslStreamPerf
                     streams[i] = stream;
                 }
 
-                using (var multiStream = new MultiStream(streams))
+                using (var multiStream = new MultiStream(streams, options.MultiStreamBlockLength))
                 {
                     var buffer = new byte[options.BufferLength];
                     var bytesRead = -1;
