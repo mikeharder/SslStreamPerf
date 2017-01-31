@@ -47,6 +47,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\core\SslStreamPerf\MultiStream.cs">
+      <Link>MultiStream.cs</Link>
+    </Compile>
     <Compile Include="..\core\SslStreamPerf\Program.cs">
       <Link>Program.cs</Link>
     </Compile>

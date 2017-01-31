@@ -165,7 +165,7 @@ namespace SslStreamPerf
             {
                 foreach (var client in clients)
                 {
-                    client.Dispose();
+                    ((IDisposable)client).Dispose();
                 }
             }
         }
@@ -288,7 +288,7 @@ namespace SslStreamPerf
             {
                 foreach (var client in clients)
                 {
-                    client.Dispose();
+                    ((IDisposable)client).Dispose();
                 }
             }
         }
