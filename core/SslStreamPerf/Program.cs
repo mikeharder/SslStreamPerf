@@ -71,6 +71,7 @@ namespace SslStreamPerf
             Console.WriteLine($"Connections: {options.Connections}");
             Console.WriteLine($"Megabytes: {string.Format("{0:n0}", options.Megabytes)}");
             Console.WriteLine($"MultiStream: {options.MultiStream}");
+            Console.WriteLine($"MultiStreamBlockLength: {options.MultiStreamBlockLength}");
             Console.WriteLine($"Sync: {options.Sync}");
             Console.WriteLine();
 
@@ -178,6 +179,7 @@ namespace SslStreamPerf
             Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
             Console.WriteLine($"Connections: {options.Connections}");
             Console.WriteLine($"MultiStream: {options.MultiStream}");
+            Console.WriteLine($"MultiStreamBlockLength: {options.MultiStreamBlockLength}");
             Console.WriteLine($"Sync: {options.Sync}");
             Console.WriteLine();
 
