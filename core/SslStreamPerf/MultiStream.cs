@@ -10,6 +10,8 @@ namespace SslStreamPerf
     public class MultiStream : Stream
     {
         private readonly Stream[] _streams;
+        private readonly Task[] _writeTasks;
+        private readonly Task<int>[] _readTasks;
 
         private readonly int _blockLength;
         private long _position;
@@ -18,6 +20,14 @@ namespace SslStreamPerf
         {
             _streams = streams.ToArray();
             _blockLength = blockLength;
+
+            _writeTasks = new Task[_streams.Length];
+            for (var i=0; i < _writeTasks.Length; i++)
+            {
+                _writeTasks[i] = Task.FromResult(0);
+            }
+
+            _readTasks = new Task<int>[_streams.Length];
         }
 
         public override bool CanRead
@@ -67,61 +77,100 @@ namespace SslStreamPerf
 
         protected override void Dispose(bool disposing)
         {
-            foreach (var stream in _streams)
+            if (disposing)
             {
-                stream.Dispose();
+                Flush();
+                foreach (var stream in _streams)
+                {
+                    stream.Dispose();
+                }
             }
+
+            base.Dispose(disposing);
         }
 
         public override void Flush()
         {
+            FlushAsync(CancellationToken.None).Wait();
+        }
+
+        public override async Task FlushAsync(CancellationToken cancellationToken)
+        {
+            await Task.WhenAll(_writeTasks);
+
             foreach (var stream in _streams)
             {
-                stream.Flush();
+                await stream.FlushAsync(cancellationToken);
             }
         }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            var totalBytesRead = 0;
-            while (totalBytesRead < count)
-            {
-                var currentStream = _streams[(_position / _blockLength) % _streams.Length];
-                var remainingBytesInCurrentStream = _blockLength - (int)(_position % _blockLength);
-
-                var remainingBytes = Math.Min(count - totalBytesRead, remainingBytesInCurrentStream);
-
-                var bytesRead = currentStream.Read(buffer, offset + totalBytesRead, remainingBytes);
-                if (bytesRead == 0)
-                {
-                    break;
-                }
-
-                totalBytesRead += bytesRead;
-                _position += bytesRead;
-            }
-            return totalBytesRead;
+            return ReadAsync(buffer, offset, count, CancellationToken.None).Result;
         }
 
         public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             var totalBytesRead = 0;
+
+            var queuedPosition = _position;
+            var totalBytesQueued = 0;
+            while (totalBytesQueued < count)
+            {
+                var current = (queuedPosition / _blockLength) % _streams.Length;
+                var currentStream = _streams[current];
+                var remainingBytesInCurrentStream = _blockLength - (int)(queuedPosition % _blockLength);
+
+                var remainingBytes = Math.Min(count - totalBytesQueued, remainingBytesInCurrentStream);
+
+                var previousReadTask = _readTasks[current];
+                if (previousReadTask != null)
+                {
+                    // Need to await previous read before another can be queued
+                    var bytesRead = await previousReadTask;
+                    totalBytesRead += bytesRead;
+                    _position += bytesRead;               
+                }
+
+                // Queue the current read rather than awaiting, so multiple reads can execute in parallel
+                _readTasks[current] = ReadAllAsync(currentStream, buffer, offset + totalBytesQueued, remainingBytes, cancellationToken);
+
+                totalBytesQueued += remainingBytes;
+                queuedPosition += remainingBytes;
+            }
+
+            for (var i=0; i < _readTasks.Length; i++)
+            {
+                var readTask = _readTasks[i];
+                if (readTask != null)
+                {
+                    var bytesRead = await readTask;
+                    totalBytesRead += bytesRead;
+                    _position += bytesRead;
+                    _readTasks[i] = null;
+                }
+            }
+
+            return totalBytesRead;
+        }
+
+        private async Task<int> ReadAllAsync(Stream stream, byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var totalBytesRead = 0;
+            var remainingBytes = count;
+
             while (totalBytesRead < count)
             {
-                var currentStream = _streams[(_position / _blockLength) % _streams.Length];
-                var remainingBytesInCurrentStream = _blockLength - (int)(_position % _blockLength);
-
-                var remainingBytes = Math.Min(count - totalBytesRead, remainingBytesInCurrentStream);
-
-                var bytesRead = await currentStream.ReadAsync(buffer, offset + totalBytesRead, remainingBytes);
+                var bytesRead = await stream.ReadAsync(buffer, offset + totalBytesRead, remainingBytes);
                 if (bytesRead == 0)
                 {
                     break;
                 }
 
                 totalBytesRead += bytesRead;
-                _position += bytesRead;
+                remainingBytes -= bytesRead;
             }
+
             return totalBytesRead;
         }
 
@@ -137,19 +186,7 @@ namespace SslStreamPerf
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            var bytesWritten = 0;
-            while (bytesWritten < count)
-            {
-                var currentStream = _streams[(_position / _blockLength) % _streams.Length];
-                var remainingBytesInCurrentStream = _blockLength - (int)(_position % _blockLength);
-
-                var remainingBytes = Math.Min(count - bytesWritten, remainingBytesInCurrentStream);
-
-                currentStream.Write(buffer, offset + bytesWritten, remainingBytes);
-
-                bytesWritten += remainingBytes;
-                _position += remainingBytes;
-            }
+            WriteAsync(buffer, offset, count, CancellationToken.None).Wait();
         }
 
         public override async Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
@@ -157,12 +194,17 @@ namespace SslStreamPerf
             var bytesWritten = 0;
             while (bytesWritten < count)
             {
-                var currentStream = _streams[(_position / _blockLength) % _streams.Length];
+                var current = (_position / _blockLength) % _streams.Length;
+                var currentStream = _streams[current];
                 var remainingBytesInCurrentStream = _blockLength - (int)(_position % _blockLength);
 
                 var remainingBytes = Math.Min(count - bytesWritten, remainingBytesInCurrentStream);
 
-                await currentStream.WriteAsync(buffer, offset + bytesWritten, remainingBytes, cancellationToken);
+                // Need to await the previous write before another can be queued
+                await _writeTasks[current];
+
+                // Queue the current write rather than awaiting, so multiple writes can execute in parallel
+                _writeTasks[current] = currentStream.WriteAsync(buffer, offset + bytesWritten, remainingBytes, cancellationToken);
 
                 bytesWritten += remainingBytes;
                 _position += remainingBytes;
