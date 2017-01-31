@@ -16,7 +16,7 @@ namespace SslStreamPerf
     {
         private class CommonOptions
         {
-            [Option('b', "bufferLength", Default = 1024 * 1024)]
+            [Option('b', "bufferLength", Default = 8 * 1024 * 1024)]
             public int BufferLength { get; set; }
 
             [Option('c', "connections", Default = 1)]
@@ -25,7 +25,7 @@ namespace SslStreamPerf
             [Option('u', "multiStream")]
             public bool MultiStream { get; set; }
 
-            [Option('l', "multiStreamBlockLength", Default = 16 * 1024)]
+            [Option('l', "multiStreamBlockLength", Default = 1024 * 1024)]
             public int MultiStreamBlockLength { get; set; }
 
             [Option('p', "port", Default = 8080)]

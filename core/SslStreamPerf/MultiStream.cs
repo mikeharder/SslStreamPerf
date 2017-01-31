@@ -16,7 +16,7 @@ namespace SslStreamPerf
         private readonly int _blockLength;
         private long _position;
 
-        public MultiStream(IEnumerable<Stream> streams, int blockLength = 16 * 1024)
+        public MultiStream(IEnumerable<Stream> streams, int blockLength = 1024 * 1024)
         {
             _streams = streams.ToArray();
             _blockLength = blockLength;
