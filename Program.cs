@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -36,6 +37,9 @@ namespace SslStreamPerf
         {
             [Option('h', "host", Required = true)]
             public string Host { get; set; }
+
+            [Option('c', "connections", Default = 1)]
+            public int Connections { get; set; }
         }
 
         public static int Main(string[] args)
@@ -63,45 +67,74 @@ namespace SslStreamPerf
 
             while (true)
             {
-                using (var client = await listener.AcceptTcpClientAsync())
-                using (var stream = new SslStream(client.GetStream()))
+                var client = await listener.AcceptTcpClientAsync();
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+                SendDataAsync(options, cert, client);
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            }
+        }
+
+        private static async Task SendDataAsync(ServerOptions options, X509Certificate2 cert, TcpClient client)
+        {
+            using (client)
+            using (var stream = new SslStream(client.GetStream()))
+            {
+                await stream.AuthenticateAsServerAsync(cert);
+
+                var data = new ZeroStream(options.Megabytes * 1024 * 1024);
+
+                Console.WriteLine();
+                Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
+
+                var sw = Stopwatch.StartNew();
+                if (options.Sync)
                 {
-                    await stream.AuthenticateAsServerAsync(cert);
-
-                    var data = new ZeroStream(options.Megabytes * 1024 * 1024);
-
-                    Console.WriteLine();
-                    Console.WriteLine($"Sending {string.Format("{0:n0}", data.Length)} bytes...");
-
-                    var sw = Stopwatch.StartNew();
-                    if (options.Sync)
-                    {
-                        data.CopyTo(stream, options.BufferLength);
-                    }
-                    else
-                    {
-                        await data.CopyToAsync(stream, options.BufferLength);
-                    }
-                    sw.Stop();
-
-                    var mbps = ((data.Length * 8) / (1024 * 1024)) / sw.Elapsed.TotalSeconds;
-                    Console.WriteLine($"Sent {string.Format("{0:n0}", data.Length)} bytes in {Math.Round(sw.Elapsed.TotalSeconds, 3)} seconds ({mbps} Mbps)");
+                    data.CopyTo(stream, options.BufferLength);
                 }
+                else
+                {
+                    await data.CopyToAsync(stream, options.BufferLength);
+                }
+                sw.Stop();
+
+                var mbps = ((data.Length * 8) / (1024 * 1024)) / sw.Elapsed.TotalSeconds;
+                Console.WriteLine($"Sent {string.Format("{0:n0}", data.Length)} bytes in {Math.Round(sw.Elapsed.TotalSeconds, 3)} seconds ({mbps} Mbps)");
             }
         }
 
         private static async Task<int> RunClientAsync(ClientOptions options)
         {
+            Console.WriteLine($"Sync: {options.Sync}");
+            Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
+            Console.WriteLine();
+
+            Console.WriteLine($"Connecting to {options.Host}:{options.Port}...");
+
             RemoteCertificateValidationCallback rcvc = (object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) => true;
 
+            var tasks = new Task<long>[options.Connections];
+
+            var sw = Stopwatch.StartNew();
+            for (var i = 0; i < options.Connections; i++)
+            {
+                tasks[i] = RunClientAsync(options, rcvc);
+            }
+            await Task.WhenAll(tasks);
+            sw.Stop();
+
+            var totalBytesRead = tasks.Select(t => t.Result).Sum();
+            
+            var mbps = ((totalBytesRead * 8) / (1024 * 1024)) / sw.Elapsed.TotalSeconds;
+            Console.WriteLine($"Read {string.Format("{0:n0}", totalBytesRead)} bytes in " +
+                $"{Math.Round(sw.Elapsed.TotalSeconds, 3)} seconds ({Math.Round(mbps, 1)} Mbps)");
+
+            return 0;
+        }
+
+        private static async Task<long> RunClientAsync(ClientOptions options, RemoteCertificateValidationCallback rcvc)
+        {
             using (var client = new TcpClient())
             {
-                Console.WriteLine($"Sync: {options.Sync}");
-                Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
-                Console.WriteLine();
-
-                Console.WriteLine($"Connecting to {options.Host}:{options.Port}...");
-
                 await client.ConnectAsync(options.Host, options.Port);
                 using (var stream = new SslStream(client.GetStream(), leaveInnerStreamOpen: false, userCertificateValidationCallback: rcvc))
                 {
@@ -111,9 +144,6 @@ namespace SslStreamPerf
                     var bytesRead = -1;
                     var totalBytesRead = (long)0;
 
-                    Console.WriteLine("Reading...");
-
-                    var sw = Stopwatch.StartNew();
                     if (options.Sync)
                     {
                         while ((bytesRead = stream.Read(buffer, 0, buffer.Length)) > 0)
@@ -128,15 +158,10 @@ namespace SslStreamPerf
                             totalBytesRead += bytesRead;
                         }
                     }
-                    sw.Stop();
 
-                    var mbps = ((totalBytesRead * 8) / (1024 * 1024)) / sw.Elapsed.TotalSeconds;
-                    Console.WriteLine($"Read {string.Format("{0:n0}", totalBytesRead)} bytes in " +
-                        $"{Math.Round(sw.Elapsed.TotalSeconds, 3)} seconds ({Math.Round(mbps, 1)} Mbps)");
+                    return totalBytesRead;
                 }
             }
-
-            return 0;
         }
 
         private class ZeroStream : Stream
