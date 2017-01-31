@@ -194,7 +194,7 @@ namespace SslStreamPerf
                     clients[i] = client;
                 }
 
-                await RunClientAsync(options, rcvc, clients);
+                totalBytesRead = await RunClientAsync(options, rcvc, clients);
             }
             else
             {
@@ -205,7 +205,6 @@ namespace SslStreamPerf
                 }
                 await Task.WhenAll(tasks);
                 totalBytesRead = tasks.Select(t => t.Result).Sum();
-
             }
 
             sw.Stop();
