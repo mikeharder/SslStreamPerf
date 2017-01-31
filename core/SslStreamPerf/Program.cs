@@ -65,6 +65,7 @@ namespace SslStreamPerf
             listener.Start();
 
             Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
+            Console.WriteLine($"Connections: {options.Connections}");
             Console.WriteLine($"Megabytes: {string.Format("{0:n0}", options.Megabytes)}");
             Console.WriteLine($"MultiStream: {options.MultiStream}");
             Console.WriteLine($"Sync: {options.Sync}");
@@ -172,6 +173,7 @@ namespace SslStreamPerf
         private static async Task<int> RunClientAsync(ClientOptions options)
         {
             Console.WriteLine($"BufferLength: {string.Format("{0:n0}", options.BufferLength)}");
+            Console.WriteLine($"Connections: {options.Connections}");
             Console.WriteLine($"MultiStream: {options.MultiStream}");
             Console.WriteLine($"Sync: {options.Sync}");
             Console.WriteLine();
