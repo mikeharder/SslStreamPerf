@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 
@@ -53,7 +54,9 @@ namespace SslStreamPerf
 
         private static async Task<int> RunServerAsync(ServerOptions options)
         {
-            var cert = new X509Certificate2("testCert.pfx", "testPassword");
+            var certPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "testCert.pfx");
+            Console.WriteLine(certPath);
+            var cert = new X509Certificate2(certPath, "testPassword");
 
             var listener = new TcpListener(IPAddress.Any, options.Port);
             listener.Start();
